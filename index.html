@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sobreviventes da Noite</title>
+    <!-- Inclui a biblioteca Tailwind CSS para estilização rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #374151;
+            background-color: #1f2937;
+            border-radius: 12px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+        }
+        .ui-container {
+            width: 800px;
+            margin-top: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.25rem;
+            color: #d1d5db;
+        }
+        .ui-panel {
+            background-color: #374151;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .button {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        .modal-content {
+            background-color: #1f2937;
+            padding: 2.5rem;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.7);
+            max-width: 500px;
+            width: 90%;
+            border: 2px solid #374151;
+        }
+        .modal-title {
+            font-size: 2.25rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            color: #f3f4f6;
+        }
+        .modal-text {
+            font-size: 1.125rem;
+            color: #d1d5db;
+            margin-bottom: 2rem;
+        }
+        .choice-card {
+            background-color: #374151;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            text-align: left;
+        }
+        .choice-card:hover {
+            background-color: #4b5563;
+        }
+        .choice-title {
+            font-weight: bold;
+            font-size: 1.25rem;
+            color: #93c5fd;
+        }
+        .choice-description {
+            font-size: 0.875rem;
+            color: #a1a1aa;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <!-- Tela Inicial -->
+    <div id="startScreen" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Sobreviventes da Noite</div>
+            <p class="modal-text">Sobreviva às hordas de monstros, colete experiência e aprimore suas habilidades. Use as setas do teclado ou WASD para se mover.</p>
+            <button id="startButton" class="button">Iniciar Jogo</button>
+        </div>
+    </div>
+
+    <!-- Tela de Evolução -->
+    <div id="evolutionScreen" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title">Evolução!</div>
+            <p class="modal-text">Escolha uma melhoria para continuar a lutar.</p>
+            <div id="choicesContainer"></div>
+        </div>
+    </div>
+
+    <!-- Tela de Game Over -->
+    <div id="gameOverScreen" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-title">Fim de Jogo</div>
+            <p id="finalScore" class="modal-text">Você sobreviveu por 0 segundos.</p>
+            <button id="restartButton" class="button">Jogar Novamente</button>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    
+    <!-- UI do Jogo -->
+    <div class="ui-container">
+        <div class="ui-panel">
+            <span>Nível:</span>
+            <span id="levelDisplay">1</span>
+        </div>
+        <div class="ui-panel">
+            <span>XP:</span>
+            <span id="xpDisplay">0</span>
+            <span>/</span>
+            <span id="xpToNextLevelDisplay">100</span>
+        </div>
+        <div class="ui-panel">
+            <span>Vida:</span>
+            <span id="healthDisplay">100</span>
+        </div>
+        <div class="ui-panel">
+            <span>Tempo:</span>
+            <span id="timeDisplay">0</span>
+        </div>
+    </div>
+
+    <script>
+        // Obtenção do contexto do canvas e elementos do DOM
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const startButton = document.getElementById('startButton');
+        const evolutionScreen = document.getElementById('evolutionScreen');
+        const choicesContainer = document.getElementById('choicesContainer');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const restartButton = document.getElementById('restartButton');
+        const levelDisplay = document.getElementById('levelDisplay');
+        const xpDisplay = document.getElementById('xpDisplay');
+        const xpToNextLevelDisplay = document.getElementById('xpToNextLevelDisplay');
+        const healthDisplay = document.getElementById('healthDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const finalScore = document.getElementById('finalScore');
+
+        // ==== Variáveis do Jogo ====
+        let gameRunning = false;
+        let lastTime = 0;
+        let player = null;
+        let enemies = [];
+        let projectiles = [];
+        let experienceOrbs = [];
+        let levelUpTimer = null;
+        let gameTime = 0;
+        let enemySpawnInterval = 1500;
+        let lastSpawnTime = 0;
+        let levelUpSounds = [];
+
+        // ==== Classes do Jogo ====
+
+        // Classe do Jogador
+        class Player {
+            constructor(x, y, size, color) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.color = color;
+                this.health = 100;
+                this.maxHealth = 100;
+                this.speed = 3;
+                this.level = 1;
+                this.xp = 0;
+                this.xpToNextLevel = 100;
+                this.weapons = [];
+                this.isInvincible = false;
+                this.invincibilityTimer = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.isInvincible ? 'rgba(255, 255, 255, 0.5)' : this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update(keys) {
+                let dx = 0;
+                let dy = 0;
+                if (keys['w'] || keys['ArrowUp']) dy -= this.speed;
+                if (keys['s'] || keys['ArrowDown']) dy += this.speed;
+                if (keys['a'] || keys['ArrowLeft']) dx -= this.speed;
+                if (keys['d'] || keys['ArrowRight']) dx += this.speed;
+
+                // Normaliza o movimento diagonal para manter a mesma velocidade
+                if (dx !== 0 && dy !== 0) {
+                    const magnitude = Math.sqrt(dx * dx + dy * dy);
+                    dx /= magnitude;
+                    dy /= magnitude;
+                }
+
+                this.x += dx * this.speed;
+                this.y += dy * this.speed;
+
+                // Limita o jogador dentro do canvas
+                this.x = Math.max(this.size, Math.min(canvas.width - this.size, this.x));
+                this.y = Math.max(this.size, Math.min(canvas.height - this.size, this.y));
+
+                if (this.isInvincible) {
+                    this.invincibilityTimer -= 1000 / 60; // 60 FPS
+                    if (this.invincibilityTimer <= 0) {
+                        this.isInvincible = false;
+                    }
+                }
+            }
+
+            takeDamage(amount) {
+                if (!this.isInvincible) {
+                    this.health -= amount;
+                    this.isInvincible = true;
+                    this.invincibilityTimer = 1000; // 1 segundo de invencibilidade
+                }
+            }
+        }
+
+        // Classe base para os inimigos
+        class Enemy {
+            constructor(x, y, size, health, speed, color, xpValue) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.health = health;
+                this.maxHealth = health;
+                this.speed = speed;
+                this.color = color;
+                this.xpValue = xpValue;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Desenha a barra de vida
+                const barWidth = this.size * 2;
+                const barHeight = 4;
+                const healthRatio = this.health / this.maxHealth;
+                ctx.fillStyle = '#444';
+                ctx.fillRect(this.x - this.size, this.y - this.size - 8, barWidth, barHeight);
+                ctx.fillStyle = healthRatio > 0.5 ? '#22c55e' : (healthRatio > 0.2 ? '#eab308' : '#ef4444');
+                ctx.fillRect(this.x - this.size, this.y - this.size - 8, barWidth * healthRatio, barHeight);
+            }
+
+            update() {
+                const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                this.x += Math.cos(angle) * this.speed;
+                this.y += Math.sin(angle) * this.speed;
+            }
+        }
+
+        // Tipos de Inimigos
+        class NormalEnemy extends Enemy {
+            constructor(x, y) {
+                super(x, y, 10, 20, 1.5, '#4ade80', 10); // Verde - vida e velocidade médias
+            }
+        }
+
+        class FastEnemy extends Enemy {
+            constructor(x, y) {
+                super(x, y, 8, 10, 3, '#ef4444', 5); // Vermelho - veloz, pouca vida
+            }
+        }
+
+        class TankEnemy extends Enemy {
+            constructor(x, y) {
+                super(x, y, 15, 50, 0.8, '#60a5fa', 20); // Azul - lento, muita vida
+            }
+        }
+
+        // Classe para orbes de experiência
+        class ExperienceOrb {
+            constructor(x, y, size, value) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.value = value;
+            }
+
+            draw() {
+                ctx.fillStyle = 'purple';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                const dist = Math.sqrt((player.x - this.x)**2 + (player.y - this.y)**2);
+                if (dist < 150) { // Atração
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(angle) * 3;
+                    this.y += Math.sin(angle) * 3;
+                }
+            }
+        }
+
+        // ==== Classes de Armas ====
+        
+        // Classe base para as armas
+        class Weapon {
+            constructor(damage, cooldown) {
+                this.damage = damage;
+                this.cooldown = cooldown;
+                this.lastAttack = 0;
+            }
+
+            // A função `attack` será implementada por cada arma específica
+            attack(player) {}
+
+            update(player, enemies, dt) {
+                this.lastAttack += dt;
+                if (this.lastAttack >= this.cooldown) {
+                    this.attack(player, enemies);
+                    this.lastAttack = 0;
+                }
+            }
+        }
+
+        // Chicote
+        class WhipWeapon extends Weapon {
+            constructor(level = 1) {
+                super(20, 1000); // Dano inicial e cooldown
+                this.level = level;
+            }
+
+            update(player, enemies, dt) {
+                this.cooldown = Math.max(500, 1000 - this.level * 50);
+                super.update(player, enemies, dt);
+            }
+
+            attack(player, enemies) {
+                const whipLength = 50 + this.level * 10;
+                const whipWidth = 10;
+                
+                // Desenha o chicote para a esquerda
+                ctx.fillStyle = '#fef08a';
+                ctx.fillRect(player.x - whipLength, player.y - whipWidth / 2, whipLength, whipWidth);
+                
+                // Desenha o chicote para a direita
+                ctx.fillRect(player.x, player.y - whipWidth / 2, whipLength, whipWidth);
+
+                // Colisão do chicote com os inimigos
+                enemies.forEach(enemy => {
+                    const distLeft = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+                    const distRight = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+                    if (distLeft < whipLength + enemy.size || distRight < whipLength + enemy.size) {
+                        enemy.health -= this.damage + this.level * 5;
+                    }
+                });
+            }
+        }
+
+        // Varinha de Fogo
+        class FireballWeapon extends Weapon {
+            constructor(level = 1) {
+                super(15, 2000); // Dano e cooldown
+                this.level = level;
+            }
+
+            update(player, enemies, dt) {
+                this.cooldown = Math.max(500, 2000 - this.level * 100);
+                super.update(player, enemies, dt);
+            }
+
+            attack(player, enemies) {
+                const numProjectiles = this.level;
+                for (let i = 0; i < numProjectiles; i++) {
+                    const target = enemies[Math.floor(Math.random() * enemies.length)];
+                    if (target) {
+                        const angle = Math.atan2(target.y - player.y, target.x - player.x) + (Math.random() - 0.5) * 0.5;
+                        projectiles.push(new Projectile(player.x, player.y, 8, Math.cos(angle) * 5, Math.sin(angle) * 5, this.damage + this.level * 5, 'orange'));
+                    }
+                }
+            }
+        }
+
+        // Varinha de Gelo
+        class IceSpearWeapon extends Weapon {
+            constructor(level = 1) {
+                super(30, 3000); // Dano e cooldown
+                this.level = level;
+            }
+            update(player, enemies, dt) {
+                this.cooldown = Math.max(1000, 3000 - this.level * 150);
+                super.update(player, enemies, dt);
+            }
+            attack(player, enemies) {
+                // Ataca o inimigo mais próximo
+                let closestEnemy = null;
+                let minDistance = Infinity;
+
+                enemies.forEach(enemy => {
+                    const dist = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        closestEnemy = enemy;
+                    }
+                });
+
+                if (closestEnemy) {
+                    const angle = Math.atan2(closestEnemy.y - player.y, closestEnemy.x - player.x);
+                    projectiles.push(new Projectile(player.x, player.y, 10, Math.cos(angle) * 8, Math.sin(angle) * 8, this.damage + this.level * 10, 'cyan', true));
+                }
+            }
+        }
+        
+        // Alho
+        class GarlicWeapon extends Weapon {
+            constructor(level = 1) {
+                super(5, 500); // Dano e cooldown
+                this.level = level;
+            }
+
+            update(player, enemies, dt) {
+                this.cooldown = Math.max(100, 500 - this.level * 20);
+                super.update(player, enemies, dt);
+            }
+            
+            attack(player, enemies) {
+                const radius = 50 + this.level * 15;
+                
+                // Desenha a aura de alho
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Dano por tick
+                enemies.forEach(enemy => {
+                    const dist = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+                    if (dist < radius + enemy.size) {
+                        enemy.health -= this.damage + this.level * 2;
+                    }
+                });
+            }
+        }
+
+        // Classe para projéteis (bola de fogo, lança de gelo)
+        class Projectile {
+            constructor(x, y, size, vx, vy, damage, color, pierce = false) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+                this.vx = vx;
+                this.vy = vy;
+                this.damage = damage;
+                this.color = color;
+                this.pierce = pierce; // Lança de gelo perfura, bola de fogo não
+                this.active = true;
+            }
+
+            draw() {
+                if (!this.active) return;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            update() {
+                if (!this.active) return;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Desativa se sair da tela
+                if (this.x < -100 || this.x > canvas.width + 100 || this.y < -100 || this.y > canvas.height + 100) {
+                    this.active = false;
+                }
+            }
+        }
+
+        // ==== Funções de Lógica do Jogo ====
+        
+        // Inicialização do jogo
+        function startGame() {
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            evolutionScreen.classList.add('hidden');
+            gameRunning = true;
+            gameTime = 0;
+            lastTime = performance.now();
+            player = new Player(canvas.width / 2, canvas.height / 2, 15, '#fff');
+            enemies = [];
+            projectiles = [];
+            experienceOrbs = [];
+            
+            levelUpTimer = setInterval(spawnLevelUpOrb, 20000); // 1 orbe de XP grande a cada 20 segundos
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Reinicia o jogo
+        function restartGame() {
+            startGame();
+        }
+
+        // Loop principal do jogo
+        function gameLoop(currentTime) {
+            if (!gameRunning) return;
+
+            const dt = currentTime - lastTime;
+            lastTime = currentTime;
+            gameTime += dt;
+
+            update(dt);
+            draw();
+
+            if (player.health <= 0) {
+                endGame();
+            } else {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Atualiza a lógica do jogo
+        function update(dt) {
+            // Atualiza o tempo e a UI
+            timeDisplay.textContent = Math.floor(gameTime / 1000);
+            levelDisplay.textContent = player.level;
+            xpDisplay.textContent = player.xp;
+            xpToNextLevelDisplay.textContent = player.xpToNextLevel;
+            healthDisplay.textContent = Math.max(0, Math.floor(player.health));
+
+            // Atualiza o jogador
+            player.update(keys);
+
+            // Atualiza inimigos
+            enemies.forEach(enemy => enemy.update());
+
+            // Atualiza projéteis
+            projectiles.forEach(p => p.update());
+            projectiles = projectiles.filter(p => p.active);
+
+            // Atualiza orbes de experiência
+            experienceOrbs.forEach(orb => orb.update());
+
+            // Atualiza as armas
+            player.weapons.forEach(weapon => weapon.update(player, enemies, dt));
+
+            // Gera inimigos
+            if (gameTime - lastSpawnTime > enemySpawnInterval) {
+                spawnEnemy();
+                lastSpawnTime = gameTime;
+            }
+
+            // Colisões
+            checkCollisions();
+
+            // Remove inimigos mortos
+            enemies = enemies.filter(enemy => {
+                if (enemy.health <= 0) {
+                    experienceOrbs.push(new ExperienceOrb(enemy.x, enemy.y, 5, enemy.xpValue));
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        // Desenha todos os elementos na tela
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            experienceOrbs.forEach(orb => orb.draw());
+            enemies.forEach(enemy => enemy.draw());
+            projectiles.forEach(p => p.draw());
+            player.draw();
+        }
+        
+        // Verifica colisões entre objetos
+        function checkCollisions() {
+            // Player vs Inimigos
+            enemies.forEach(enemy => {
+                const dist = Math.sqrt((player.x - enemy.x)**2 + (player.y - enemy.y)**2);
+                if (dist < player.size + enemy.size) {
+                    player.takeDamage(1);
+                }
+            });
+
+            // Projéteis vs Inimigos
+            projectiles.forEach(p => {
+                enemies.forEach(enemy => {
+                    const dist = Math.sqrt((p.x - enemy.x)**2 + (p.y - enemy.y)**2);
+                    if (dist < p.size + enemy.size) {
+                        enemy.health -= p.damage;
+                        if (!p.pierce) { // Se não perfura, desativa o projétil
+                            p.active = false;
+                        }
+                    }
+                });
+            });
+
+            // Player vs Orbes de XP
+            experienceOrbs.forEach(orb => {
+                const dist = Math.sqrt((player.x - orb.x)**2 + (player.y - orb.y)**2);
+                if (dist < player.size + orb.size) {
+                    player.xp += orb.value;
+                    orb.size = 0; // "Coleta" o orbe
+                    if (player.xp >= player.xpToNextLevel) {
+                        levelUp();
+                    }
+                }
+            });
+
+            experienceOrbs = experienceOrbs.filter(orb => orb.size > 0);
+        }
+
+        // Gera inimigos fora da tela
+        function spawnEnemy() {
+            let enemyType = Math.random();
+            let enemy;
+            const size = canvas.width > canvas.height ? canvas.width : canvas.height;
+            const side = Math.floor(Math.random() * 4);
+            let x, y;
+
+            switch (side) {
+                case 0: // Topo
+                    x = Math.random() * canvas.width;
+                    y = -50;
+                    break;
+                case 1: // Direita
+                    x = canvas.width + 50;
+                    y = Math.random() * canvas.height;
+                    break;
+                case 2: // Baixo
+                    x = Math.random() * canvas.width;
+                    y = canvas.height + 50;
+                    break;
+                case 3: // Esquerda
+                    x = -50;
+                    y = Math.random() * canvas.height;
+                    break;
+            }
+
+            if (enemyType < 0.6) {
+                enemy = new NormalEnemy(x, y);
+            } else if (enemyType < 0.8) {
+                enemy = new FastEnemy(x, y);
+            } else {
+                enemy = new TankEnemy(x, y);
+            }
+            
+            enemies.push(enemy);
+        }
+
+        // Gera um orbe de XP grande para ser coletado
+        function spawnLevelUpOrb() {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            experienceOrbs.push(new ExperienceOrb(x, y, 15, 100));
+        }
+
+        // Lógica de subida de nível
+        function levelUp() {
+            gameRunning = false;
+            player.level++;
+            player.xp -= player.xpToNextLevel;
+            player.xpToNextLevel = Math.floor(player.xpToNextLevel * 1.5);
+            
+            showEvolutionScreen();
+        }
+
+        // Exibe a tela de evolução com 3 opções de melhoria
+        function showEvolutionScreen() {
+            choicesContainer.innerHTML = '';
+            const allOptions = [
+                { name: 'Chicote', desc: 'Aumenta o dano e a frequência de ataque do chicote.' },
+                { name: 'Varinha de Fogo', desc: 'Aumenta o dano e a quantidade de bolas de fogo.' },
+                { name: 'Varinha de Gelo', desc: 'Aumenta o dano e a velocidade da lança de gelo.' },
+                { name: 'Alho', desc: 'Aumenta o raio e o dano da aura de alho.' },
+                { name: 'Vida Extra', desc: 'Aumenta sua vida máxima em 25 pontos.' },
+                { name: 'Velocidade', desc: 'Aumenta sua velocidade de movimento.' }
+            ];
+
+            const shuffledOptions = allOptions.sort(() => 0.5 - Math.random());
+            const selectedChoices = shuffledOptions.slice(0, 3);
+
+            selectedChoices.forEach(choice => {
+                const choiceDiv = document.createElement('div');
+                choiceDiv.className = 'choice-card';
+                choiceDiv.innerHTML = `
+                    <div class="choice-title">${choice.name}</div>
+                    <div class="choice-description">${choice.desc}</div>
+                `;
+                choiceDiv.onclick = () => selectChoice(choice.name);
+                choicesContainer.appendChild(choiceDiv);
+            });
+
+            evolutionScreen.classList.remove('hidden');
+        }
+
+        // Lógica para aplicar a melhoria selecionada
+        function selectChoice(choiceName) {
+            switch (choiceName) {
+                case 'Chicote':
+                    let whip = player.weapons.find(w => w instanceof WhipWeapon);
+                    if (whip) whip.level++;
+                    else player.weapons.push(new WhipWeapon());
+                    break;
+                case 'Varinha de Fogo':
+                    let fire = player.weapons.find(w => w instanceof FireballWeapon);
+                    if (fire) fire.level++;
+                    else player.weapons.push(new FireballWeapon());
+                    break;
+                case 'Varinha de Gelo':
+                    let ice = player.weapons.find(w => w instanceof IceSpearWeapon);
+                    if (ice) ice.level++;
+                    else player.weapons.push(new IceSpearWeapon());
+                    break;
+                case 'Alho':
+                    let garlic = player.weapons.find(w => w instanceof GarlicWeapon);
+                    if (garlic) garlic.level++;
+                    else player.weapons.push(new GarlicWeapon());
+                    break;
+                case 'Vida Extra':
+                    player.maxHealth += 25;
+                    player.health = player.maxHealth;
+                    break;
+                case 'Velocidade':
+                    player.speed += 0.5;
+                    break;
+            }
+            
+            evolutionScreen.classList.add('hidden');
+            gameRunning = true;
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Lógica de fim de jogo
+        function endGame() {
+            gameRunning = false;
+            clearInterval(levelUpTimer);
+            finalScore.textContent = `Você sobreviveu por ${Math.floor(gameTime / 1000)} segundos.`;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        // ==== Gerenciamento de Teclas ====
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+        });
+        window.addEventListener('keyup', e => {
+            keys[e.key.toLowerCase()] = false;
+        });
+
+        // Event Listeners dos botões
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+    </script>
+</body>
+</html>
